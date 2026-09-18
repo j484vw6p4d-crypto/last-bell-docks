@@ -76,7 +76,6 @@ function World.wipe()
 end
 
 function World.guardLeftovers()
-	-- no-op: ChildAdded wipes were deleting the dock during Play
 end
 
 local function applySky()
@@ -102,34 +101,29 @@ end
 
 function World.build()
 	World.wipe()
-
-	local old = Workspace:FindFirstChild("Harbor")
-	if old then
-		old:Destroy()
+	local existing = Workspace:FindFirstChild("Harbor")
+	if existing then
+		print("[Last Bell] Harbor already present — skip rebuild")
+		applySky()
+		World.setNight(false)
+		return existing
 	end
 
 	local folder = Instance.new("Folder")
 	folder.Name = "Harbor"
 	folder.Parent = Workspace
-
 	applySky()
-
 	part("Dock", Vector3.new(200, 6, 200), CFrame.new(0, DOCK_Y, 0), Color3.fromRGB(92, 62, 36), folder, Enum.Material.Wood)
-
 	local water = part("Water", Vector3.new(500, 8, 500), CFrame.new(0, DOCK_Y - 8, 0), Color3.fromRGB(16, 46, 78), folder, Enum.Material.Glass)
 	water.Transparency = 0.35
 	water.CanCollide = false
-
 	local pier = part("Pier", Vector3.new(18, 2, 70), CFrame.new(0, DOCK_Y + 2, 110), Color3.fromRGB(112, 78, 44), folder, Enum.Material.Wood)
-	labelOn(pier, "PIER — press E to harvest", Vector3.new(0, 9, 0), Color3.fromRGB(255, 220, 120))
-
+	labelOn(pier, "PIER - press E to harvest", Vector3.new(0, 9, 0), Color3.fromRGB(255, 220, 120))
 	for i = -1, 1, 2 do
 		part("PierRail", Vector3.new(0.6, 2.4, 70), CFrame.new(i * 9, DOCK_Y + 3.6, 110), Color3.fromRGB(72, 50, 30), folder, Enum.Material.Wood)
 	end
-
 	local crateAnchor = part("CratePile", Vector3.new(8, 1, 8), CFrame.new(0, DOCK_Y + 3.2, 136), Color3.fromRGB(70, 48, 28), folder, Enum.Material.Wood)
-	labelOn(crateAnchor, "CARGO — E harvest", Vector3.new(0, 8, 0), Color3.fromRGB(255, 240, 180))
-
+	labelOn(crateAnchor, "CARGO - E harvest", Vector3.new(0, 8, 0), Color3.fromRGB(255, 240, 180))
 	local harvest = Instance.new("ProximityPrompt")
 	harvest.Name = "HarvestPrompt"
 	harvest.ObjectText = "Pier cargo"
@@ -139,7 +133,6 @@ function World.build()
 	harvest.RequiresLineOfSight = false
 	harvest.KeyboardKeyCode = Enum.KeyCode.E
 	harvest.Parent = crateAnchor
-
 	local pierCrates = Instance.new("Folder")
 	pierCrates.Name = "PierCrates"
 	pierCrates.Parent = folder
@@ -154,16 +147,11 @@ function World.build()
 	for i, off in ipairs(offsets) do
 		local box = part("Crate_" .. i, Vector3.new(2.6, 2.2, 2.6), crateAnchor.CFrame * CFrame.new(off), Color3.fromRGB(168, 118, 64), pierCrates, Enum.Material.Wood)
 		box.CanCollide = false
-		box:SetAttribute("FullSizeX", 2.6)
-		box:SetAttribute("FullSizeY", 2.2)
-		box:SetAttribute("FullSizeZ", 2.6)
 	end
-
 	part("TowerBase", Vector3.new(14, 2, 14), CFrame.new(0, DOCK_Y + 4, 0), Color3.fromRGB(48, 48, 62), folder)
 	part("BellTower", Vector3.new(7, 24, 7), CFrame.new(0, DOCK_Y + 17, 0), Color3.fromRGB(42, 42, 58), folder)
 	local bell = part("Bell", Vector3.new(6, 4, 6), CFrame.new(0, DOCK_Y + 30, 0), Color3.fromRGB(228, 186, 52), folder, Enum.Material.Neon)
 	labelOn(bell, "THE BELL  -  P rebirth at 500", Vector3.new(0, 8, 0), Color3.fromRGB(255, 220, 90))
-
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "SpawnLocation"
 	spawn.Size = Vector3.new(12, 1, 12)
@@ -173,21 +161,19 @@ function World.build()
 	spawn.Neutral = true
 	spawn.BrickColor = BrickColor.new("Dark orange")
 	spawn.Parent = folder
-
 	local stalls = Instance.new("Folder")
 	stalls.Name = "Stalls"
 	stalls.Parent = folder
-
 	local stallY = DOCK_Y + 3.5
 	for i = 1, Config.MaxStalls do
 		local a = ((i - 1) / Config.MaxStalls) * math.pi * 2
 		local pos = Vector3.new(math.cos(a) * Config.RingRadius, stallY, math.sin(a) * Config.RingRadius)
-		local look = CFrame.lookAt(pos, Vector3.new(0, stallY, 0))
+		local look = CFrame.new(pos, Vector3.new(0, stallY, 0))
 		local m = Instance.new("Model")
 		m.Name = "Stall_" .. i
 		m.Parent = stalls
-		local floor = part("Floor", Vector3.new(16, 1, 16), look, Color3.fromRGB(58, 42, 30), m, Enum.Material.Wood)
-		m.PrimaryPart = floor
+		local stallFloor = part("Floor", Vector3.new(16, 1, 16), look, Color3.fromRGB(58, 42, 30), m, Enum.Material.Wood)
+		m.PrimaryPart = stallFloor
 		part("Back", Vector3.new(16, 8, 0.7), look * CFrame.new(0, 4.5, 7.6), Color3.fromRGB(86, 60, 38), m, Enum.Material.Wood)
 		part("Roof", Vector3.new(17, 0.7, 17), look * CFrame.new(0, 9.2, 0), Color3.fromRGB(72, 48, 30), m, Enum.Material.Wood)
 		part("Counter", Vector3.new(10, 2, 2.2), look * CFrame.new(0, 1.6, -6.2), Color3.fromRGB(110, 82, 52), m, Enum.Material.Wood)
@@ -201,9 +187,8 @@ function World.build()
 		local display = Instance.new("Folder")
 		display.Name = "Display"
 		display.Parent = m
-		labelOn(floor, "Empty stall", Vector3.new(0, 7, 0), Color3.fromRGB(230, 230, 230))
+		labelOn(stallFloor, "Empty stall", Vector3.new(0, 7, 0), Color3.fromRGB(230, 230, 230))
 	end
-
 	World.setNight(false)
 	print("[Last Bell] Harbor built")
 	return folder
@@ -217,27 +202,10 @@ function World.setNight(on: boolean)
 	Lighting.FogColor = if on then Color3.fromRGB(8, 10, 22) else Color3.fromRGB(70, 92, 118)
 	Lighting.Ambient = if on then Color3.fromRGB(18, 20, 32) else Color3.fromRGB(78, 72, 68)
 	Lighting.OutdoorAmbient = if on then Color3.fromRGB(22, 26, 42) else Color3.fromRGB(118, 108, 96)
-
 	local atm = Lighting:FindFirstChild("HarborFog")
 	if atm and atm:IsA("Atmosphere") then
 		atm.Density = if on then 0.55 else 0.35
 		atm.Haze = if on then 2.2 else 1.1
-	end
-
-	local harbor = Workspace:FindFirstChild("Harbor")
-	if not harbor then
-		return
-	end
-	local stalls = harbor:FindFirstChild("Stalls")
-	if not stalls then
-		return
-	end
-	for _, stall in ipairs(stalls:GetChildren()) do
-		local lamp = stall:FindFirstChild("Lamp")
-		local light = lamp and lamp:FindFirstChild("StallLight")
-		if light and light:IsA("PointLight") then
-			light.Brightness = if on then 3.4 else 1.4
-		end
 	end
 end
 
@@ -248,9 +216,9 @@ function World.setStallOwner(index: number, name: string)
 	if not stall then
 		return
 	end
-	local floor = stall:FindFirstChild("Floor")
-	if floor and floor:IsA("BasePart") then
-		labelOn(floor, name, Vector3.new(0, 7, 0), Color3.fromRGB(255, 230, 180))
+	local stallFloor = stall:FindFirstChild("Floor")
+	if stallFloor and stallFloor:IsA("BasePart") then
+		labelOn(stallFloor, name, Vector3.new(0, 7, 0), Color3.fromRGB(255, 230, 180))
 	end
 end
 
@@ -266,8 +234,8 @@ function World.refreshDisplay(index: number, kinds: { string })
 		return
 	end
 	folder:ClearAllChildren()
-	local floor = stall:FindFirstChild("Floor") :: BasePart?
-	if not floor then
+	local stallFloor = stall:FindFirstChild("Floor") :: BasePart?
+	if not stallFloor then
 		return
 	end
 	for i, kind in ipairs(kinds) do
@@ -279,7 +247,7 @@ function World.refreshDisplay(index: number, kinds: { string })
 		box.CanCollide = false
 		box.Color = color
 		box.Material = Enum.Material.Wood
-		box.CFrame = floor.CFrame * CFrame.new(-4 + (i - 1) * 2.8, 2.4, 1)
+		box.CFrame = stallFloor.CFrame * CFrame.new(-4 + (i - 1) * 2.8, 2.4, 1)
 		box.Parent = folder
 		labelOn(box, kind, Vector3.new(0, 2.2, 0), Color3.new(1, 1, 1))
 	end
@@ -299,13 +267,13 @@ function World.setBuyer(index: number, visible: boolean)
 	if not visible then
 		return
 	end
-	local floor = stall:FindFirstChild("Floor") :: BasePart?
-	if not floor then
+	local stallFloor = stall:FindFirstChild("Floor") :: BasePart?
+	if not stallFloor then
 		return
 	end
-	local buyer = part("Buyer", Vector3.new(2.2, 5.2, 2.2), floor.CFrame * CFrame.new(5.2, 3.4, -4.5), Color3.fromRGB(255, 196, 64), stall, Enum.Material.Neon)
+	local buyer = part("Buyer", Vector3.new(2.2, 5.2, 2.2), stallFloor.CFrame * CFrame.new(5.2, 3.4, -4.5), Color3.fromRGB(255, 196, 64), stall, Enum.Material.Neon)
 	buyer.CanCollide = false
-	labelOn(buyer, "BUYER — press Q to sell", Vector3.new(0, 4.2, 0), Color3.fromRGB(255, 230, 120))
+	labelOn(buyer, "BUYER - press Q to sell", Vector3.new(0, 4.2, 0), Color3.fromRGB(255, 230, 120))
 end
 
 function World.setPierGrown(count: number)
@@ -320,26 +288,7 @@ function World.setPierGrown(count: number)
 	end)
 	for i, child in ipairs(kids) do
 		if child:IsA("BasePart") then
-			local on = i <= count
-			child.Transparency = if on then 0 else 0.75
-			local fx = child:GetAttribute("FullSizeX")
-			local fy = child:GetAttribute("FullSizeY")
-			local fz = child:GetAttribute("FullSizeZ")
-			if typeof(fx) == "number" and typeof(fy) == "number" and typeof(fz) == "number" then
-				child.Size = if on then Vector3.new(fx, fy, fz) else Vector3.new(1.1, 1.1, 1.1)
-			end
-		end
-	end
-	local pile = harbor and harbor:FindFirstChild("CratePile")
-	if pile and pile:IsA("BasePart") then
-		local sign = pile:FindFirstChild("Sign")
-		local lab = sign and sign:FindFirstChild("Text")
-		if lab and lab:IsA("TextLabel") then
-			if count > 0 then
-				lab.Text = "CARGO x" .. count .. " — E harvest"
-			else
-				lab.Text = "Unloading... wait for crates"
-			end
+			child.Transparency = if i <= count then 0 else 0.75
 		end
 	end
 end
