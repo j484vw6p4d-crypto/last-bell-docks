@@ -23,7 +23,6 @@ local Remotes = require(RS.Shared.Remotes)
 
 local player = Players.LocalPlayer
 local pg = player:WaitForChild("PlayerGui")
-
 local old = pg:FindFirstChild("LastBellHUD")
 if old then
 	old:Destroy()
@@ -33,42 +32,79 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "LastBellHUD"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = pg
 
 local veil = Instance.new("Frame")
 veil.Name = "NightVeil"
-veil.BackgroundColor3 = Color3.fromRGB(6, 8, 22)
+veil.BackgroundColor3 = Color3.fromRGB(8, 10, 28)
 veil.BackgroundTransparency = 1
 veil.BorderSizePixel = 0
 veil.Size = UDim2.fromScale(1, 1)
 veil.ZIndex = 0
 veil.Parent = gui
 
-local function label(name, pos, size, text, color)
+local function corner(parent: Instance, r: number)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r)
+	c.Parent = parent
+end
+
+local function stroke(parent: Instance, color: Color3, t: number)
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = t
+	s.Transparency = 0.35
+	s.Parent = parent
+end
+
+local function panel(name: string, pos: UDim2, size: UDim2, parent: Instance): Frame
+	local f = Instance.new("Frame")
+	f.Name = name
+	f.Position = pos
+	f.Size = size
+	f.BackgroundColor3 = Color3.fromRGB(12, 16, 28)
+	f.BackgroundTransparency = 0.12
+	f.BorderSizePixel = 0
+	f.ZIndex = 2
+	f.Parent = parent
+	corner(f, 14)
+	stroke(f, Color3.fromRGB(255, 196, 90), 1.2)
+	return f
+end
+
+local function txt(name: string, parent: Instance, pos: UDim2, size: UDim2, text: string, color: Color3, textSize: number): TextLabel
 	local l = Instance.new("TextLabel")
 	l.Name = name
 	l.Position = pos
 	l.Size = size
+	l.BackgroundTransparency = 1
 	l.Text = text
-	l.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
-	l.BackgroundTransparency = 0.15
-	l.TextColor3 = color or Color3.new(1, 1, 1)
-	l.Font = Enum.Font.SourceSansBold
-	l.TextSize = 16
-	l.ZIndex = 2
-	l.Parent = gui
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 8)
-	c.Parent = l
+	l.TextColor3 = color
+	l.Font = Enum.Font.GothamBold
+	l.TextSize = textSize
+	l.ZIndex = 3
+	l.Parent = parent
 	return l
 end
 
-label("Title", UDim2.new(0.5, -170, 0, 16), UDim2.new(0, 340, 0, 40), "Last Bell", Color3.fromRGB(255, 220, 120)).TextSize = 22
-local phaseLbl = label("Phase", UDim2.new(0.5, -90, 0, 62), UDim2.new(0, 180, 0, 32), "DAY", Color3.fromRGB(180, 255, 180))
-local stats = label("Stats", UDim2.new(0, 16, 1, -92), UDim2.new(0, 360, 0, 40), "Coins 0   Carry none   Stock 0")
-local hint = label("Hint", UDim2.new(1, -430, 1, -52), UDim2.new(0, 414, 0, 36), "E harvest   F stock   Q sell (day)   R steal (night)   P rebirth")
-hint.TextSize = 14
-local toast = label("Toast", UDim2.new(0.5, -220, 0, 104), UDim2.new(0, 440, 0, 36), "Walk to the PIER and press E")
+local top = panel("Top", UDim2.new(0.5, -190, 0, 14), UDim2.new(0, 380, 0, 86), gui)
+txt("Title", top, UDim2.new(0, 16, 0, 8), UDim2.new(1, -32, 0, 28), "LAST BELL", Color3.fromRGB(255, 214, 110), 22)
+local phaseLbl = txt("Phase", top, UDim2.new(0, 16, 0, 38), UDim2.new(0.4, 0, 0, 36), "DAY", Color3.fromRGB(140, 255, 170), 20)
+local toast = txt("Toast", top, UDim2.new(0.38, 0, 0, 38), UDim2.new(0.6, -16, 0, 36), "Walk to the PIER  ·  press E", Color3.fromRGB(235, 235, 245), 15)
+toast.TextXAlignment = Enum.TextXAlignment.Right
+toast.TextWrapped = true
+
+local left = panel("Wallet", UDim2.new(0, 18, 1, -118), UDim2.new(0, 280, 0, 96), gui)
+local coinsLbl = txt("Coins", left, UDim2.new(0, 16, 0, 10), UDim2.new(1, -32, 0, 32), "0 coins", Color3.fromRGB(255, 214, 110), 24)
+coinsLbl.TextXAlignment = Enum.TextXAlignment.Left
+local carryLbl = txt("Carry", left, UDim2.new(0, 16, 0, 42), UDim2.new(1, -32, 0, 22), "Carry  ·  empty", Color3.fromRGB(210, 210, 220), 16)
+carryLbl.TextXAlignment = Enum.TextXAlignment.Left
+local stockLbl = txt("Stock", left, UDim2.new(0, 16, 0, 64), UDim2.new(1, -32, 0, 22), "Stall  ·  0 stocked", Color3.fromRGB(210, 210, 220), 16)
+stockLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local keys = panel("Keys", UDim2.new(1, -338, 1, -78), UDim2.new(0, 320, 0, 56), gui)
+txt("KeyLine", keys, UDim2.new(0, 10, 0, 8), UDim2.new(1, -20, 1, -16), "E harvest   F stock   Q sell   R steal   P rebirth", Color3.fromRGB(230, 230, 240), 14)
 
 local stickyUntil = 0
 local lastPayload: any = nil
@@ -76,17 +112,17 @@ local lastPayload: any = nil
 local function objectiveFrom(payload: any): string
 	local ph = tostring(payload.phase or "Day")
 	if ph == "Night" then
-		return "NIGHT — R near another stall to steal"
+		return "Night  ·  R at another stall"
 	elseif ph == "Bell" then
-		return "THE BELL — night is coming"
+		return "Bell  ·  night incoming"
 	elseif payload.carried then
-		return "F at YOUR stall to stock " .. tostring(payload.carried)
+		return "F at YOUR stall"
 	elseif (payload.display or 0) > 0 then
-		return "Q at the gold buyer to sell"
+		return "Q to sell to the buyer"
 	elseif (payload.coins or 0) >= (payload.need or 500) then
 		return "P at the bell to rebirth"
 	end
-	return "Walk to the PIER and press E"
+	return "Walk to the PIER  ·  press E"
 end
 
 Remotes.get("Notify").OnClientEvent:Connect(function(text)
@@ -99,13 +135,13 @@ end)
 Remotes.get("Phase").OnClientEvent:Connect(function(ph)
 	phaseLbl.Text = string.upper(tostring(ph))
 	if ph == "Night" then
-		phaseLbl.TextColor3 = Color3.fromRGB(255, 120, 120)
-		veil.BackgroundTransparency = 0.62
+		phaseLbl.TextColor3 = Color3.fromRGB(255, 120, 130)
+		veil.BackgroundTransparency = 0.58
 	elseif ph == "Bell" then
 		phaseLbl.TextColor3 = Color3.fromRGB(255, 220, 80)
-		veil.BackgroundTransparency = 0.8
+		veil.BackgroundTransparency = 0.78
 	else
-		phaseLbl.TextColor3 = Color3.fromRGB(180, 255, 180)
+		phaseLbl.TextColor3 = Color3.fromRGB(140, 255, 170)
 		veil.BackgroundTransparency = 1
 	end
 end)
@@ -115,13 +151,9 @@ Remotes.get("Stats").OnClientEvent:Connect(function(payload)
 		return
 	end
 	lastPayload = payload
-	stats.Text = string.format(
-		"Coins %s   Carry %s   Stock %s   RB %s",
-		tostring(payload.coins),
-		tostring(payload.carried or "none"),
-		tostring(payload.display),
-		tostring(payload.rebirths)
-	)
+	coinsLbl.Text = tostring(payload.coins or 0) .. " coins"
+	carryLbl.Text = "Carry  ·  " .. tostring(payload.carried or "empty")
+	stockLbl.Text = "Stall  ·  " .. tostring(payload.display or 0) .. " stocked"
 	if os.clock() >= stickyUntil then
 		toast.Text = objectiveFrom(payload)
 	end
@@ -138,12 +170,6 @@ Remotes.get("PlaySound").OnClientEvent:Connect(function(key)
 	s.Parent = SoundService
 	s:Play()
 	game:GetService("Debris"):AddItem(s, 3)
-end)
-
-task.delay(4, function()
-	if workspace:FindFirstChild("Harbor") == nil then
-		toast.Text = "On wood floor. Harbor still loading — wait or Stop Play and rebuild."
-	end
 end)
 
 task.spawn(function()
