@@ -3,6 +3,21 @@ local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
+
+do
+	if not workspace:FindFirstChild("ClientFloor") then
+		local p = Instance.new("Part")
+		p.Name = "ClientFloor"
+		p.Size = Vector3.new(260, 10, 260)
+		p.CFrame = CFrame.new(0, 4, 0)
+		p.Anchored = true
+		p.CanCollide = true
+		p.Color = Color3.fromRGB(92, 62, 36)
+		p.Material = Enum.Material.Wood
+		p.Parent = workspace
+	end
+end
+
 local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Remotes = require(RS.Shared.Remotes)
 
@@ -38,7 +53,7 @@ local function label(name, pos, size, text, color)
 	l.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
 	l.BackgroundTransparency = 0.15
 	l.TextColor3 = color or Color3.new(1, 1, 1)
-	l.Font = Enum.Font.GothamBold
+	l.Font = Enum.Font.SourceSansBold
 	l.TextSize = 16
 	l.ZIndex = 2
 	l.Parent = gui
@@ -48,7 +63,7 @@ local function label(name, pos, size, text, color)
 	return l
 end
 
-label("Title", UDim2.new(0.5, -170, 0, 16), UDim2.new(0, 340, 0, 40), "🔔 Last Bell", Color3.fromRGB(255, 220, 120)).TextSize = 22
+label("Title", UDim2.new(0.5, -170, 0, 16), UDim2.new(0, 340, 0, 40), "Last Bell", Color3.fromRGB(255, 220, 120)).TextSize = 22
 local phaseLbl = label("Phase", UDim2.new(0.5, -90, 0, 62), UDim2.new(0, 180, 0, 32), "DAY", Color3.fromRGB(180, 255, 180))
 local stats = label("Stats", UDim2.new(0, 16, 1, -92), UDim2.new(0, 360, 0, 40), "Coins 0   Carry none   Stock 0")
 local hint = label("Hint", UDim2.new(1, -430, 1, -52), UDim2.new(0, 414, 0, 36), "E harvest   F stock   Q sell (day)   R steal (night)   P rebirth")
@@ -127,7 +142,7 @@ end)
 
 task.delay(4, function()
 	if workspace:FindFirstChild("Harbor") == nil then
-		toast.Text = "Harbor missing. Stop Play. File > New > Baseplate. Rojo Connect. Play."
+		toast.Text = "On wood floor. Harbor still loading — wait or Stop Play and rebuild."
 	end
 end)
 
