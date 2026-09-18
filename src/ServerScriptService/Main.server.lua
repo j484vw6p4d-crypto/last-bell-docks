@@ -1,14 +1,41 @@
 --!strict
+print("[Last Bell] Main starting")
+
 local Players = game:GetService("Players")
 local StarterPack = game:GetService("StarterPack")
 local RS = game:GetService("ReplicatedStorage")
+
+pcall(function()
+	workspace.StreamingEnabled = false
+end)
+pcall(function()
+	workspace.Terrain.Decoration = false
+	workspace.Terrain:Clear()
+end)
+for _, child in ipairs(workspace:GetChildren()) do
+	if not child:IsA("Camera") and not child:IsA("Terrain") and not child:FindFirstChildOfClass("Humanoid") then
+		pcall(function()
+			child:Destroy()
+		end)
+	end
+end
+
 local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Remotes = require(RS.Shared.Remotes)
-local World = require(script.Parent.Services.World)
+local World = require(script.Parent:WaitForChild("Services"):WaitForChild("World"))
 
 Remotes.init()
-World.build()
-World.guardLeftovers()
+local built, buildErr = pcall(function()
+	World.build()
+end)
+if not built then
+	warn("[Last Bell] World.build FAILED: ", buildErr)
+else
+	print("[Last Bell] World.build ok")
+end
+pcall(function()
+	World.guardLeftovers()
+end)
 
 for _, child in ipairs(StarterPack:GetChildren()) do
 	child:Destroy()
