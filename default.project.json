@@ -1,0 +1,26 @@
+{
+  "name": "LastBellDocks",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": { "$path": "src/ReplicatedStorage/Shared" },
+      "Remotes": { "$className": "Folder" }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Services": { "$path": "src/ServerScriptService/Services" },
+      "Main": { "$path": "src/ServerScriptService/Main.server.lua" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": { "$path": "src/StarterPlayer/StarterPlayerScripts/Client.client.lua" }
+      }
+    },
+    "Workspace": { "$className": "Workspace" },
+    "Lighting": { "$className": "Lighting" },
+    "SoundService": { "$className": "SoundService" }
+  }
+}
