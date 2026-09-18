@@ -10,15 +10,9 @@
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "$ignoreUnknownInstances": true,
-      "Boot": {
-        "$className": "Script",
-        "$path": "src/ServerScriptService/Boot.server.lua"
-      },
+      "Boot": { "$path": "src/ServerScriptService/Boot.server.lua" },
       "Services": { "$path": "src/ServerScriptService/Services" },
-      "Main": {
-        "$className": "Script",
-        "$path": "src/ServerScriptService/Main.server.lua"
-      }
+      "Main": { "$path": "src/ServerScriptService/Main.server.lua" }
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
