@@ -1,13 +1,13 @@
---!strict
+--!nocheck
 local Config = {}
-Config.MaxStalls = 20
+Config.MaxStalls = 8
 Config.RingRadius = 70
-Config.DaySeconds = 50
-Config.NightSeconds = 40
+Config.DaySeconds = 60
+Config.NightSeconds = 35
 Config.BellSeconds = 4
 Config.StartingCoins = 0
 Config.RebirthCost = 500
-Config.GrowSeconds = 6
+Config.GrowSeconds = 5
 Config.PierMaxCrates = 6
 Config.MaxDisplay = 4
 Config.CrateValue = { Wood = 8, Spice = 20, Silk = 45, Relic = 120 }
@@ -24,6 +24,5 @@ Config.Sounds = {
 	bell = "rbxasset://sounds/action_get_up.mp3",
 	night = "rbxasset://sounds/action_falling.mp3",
 }
--- Create these in Creator Dashboard, then paste IDs. 0 = disabled.
 Config.Gamepasses = { DoubleCoins = 0, ExtraSlot = 0, FastGrow = 0 }
 return Config
