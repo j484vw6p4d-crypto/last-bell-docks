@@ -9,15 +9,27 @@ local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))
 local Remotes = require(RS.Shared.Remotes)
 Remotes.init()
 
-local harbor = workspace:WaitForChild("Harbor", 15)
-if not harbor then
-	warn("[Last Bell] Harbor missing — Boot did not run")
+local function getHarbor()
+	return workspace:FindFirstChild("Harbor")
 end
+
+local function waitHarbor()
+	local deadline = os.clock() + 20
+	repeat
+		local h = getHarbor()
+		if h and h:FindFirstChild("CratePile") and h:FindFirstChild("Stalls") then
+			return h
+		end
+		task.wait(0.1)
+	until os.clock() > deadline
+	return getHarbor()
+end
+
+waitHarbor()
 
 local states = {}
 local stallOwner = {}
 local phase = "Day"
-local nightIndex = 0
 local rng = Random.new()
 local pierCount = Config.PierMaxCrates
 local harvestLock = {}
@@ -32,7 +44,8 @@ local function sound(p, key)
 end
 
 local function pile()
-	local p = harbor and harbor:FindFirstChild("CratePile")
+	local h = getHarbor()
+	local p = h and h:FindFirstChild("CratePile")
 	if p and p:IsA("BasePart") then
 		return p
 	end
@@ -40,7 +53,8 @@ local function pile()
 end
 
 local function stallModel(i)
-	local folder = harbor and harbor:FindFirstChild("Stalls")
+	local h = getHarbor()
+	local folder = h and h:FindFirstChild("Stalls")
 	return folder and folder:FindFirstChild("Stall_" .. i)
 end
 
@@ -53,7 +67,7 @@ local function stallFloor(i)
 	return nil
 end
 
-local function setSign(part, text, color)
+local function setSign(part, text, color, offset)
 	if not part then
 		return
 	end
@@ -61,8 +75,8 @@ local function setSign(part, text, color)
 	if not bill then
 		bill = Instance.new("BillboardGui")
 		bill.Name = "Sign"
-		bill.Size = UDim2.fromOffset(280, 42)
-		bill.StudsOffset = Vector3.new(0, 7, 0)
+		bill.Size = UDim2.fromOffset(300, 44)
+		bill.StudsOffset = offset or Vector3.new(0, 7, 0)
 		bill.AlwaysOnTop = true
 		bill.Parent = part
 		local t = Instance.new("TextLabel")
@@ -78,6 +92,29 @@ local function setSign(part, text, color)
 		lab.Text = text
 		lab.TextColor3 = color or Color3.new(1, 1, 1)
 	end
+end
+
+local function floatText(at, text, color)
+	local h = getHarbor()
+	if not h then
+		return
+	end
+	local p = Instance.new("Part")
+	p.Name = "FloatText"
+	p.Anchored = true
+	p.CanCollide = false
+	p.Transparency = 1
+	p.Size = Vector3.new(1, 1, 1)
+	p.Position = at + Vector3.new(0, 6, 0)
+	p.Parent = h
+	setSign(p, text, color, Vector3.new(0, 0, 0))
+	task.spawn(function()
+		for _ = 1, 12 do
+			p.Position = p.Position + Vector3.new(0, 0.35, 0)
+			task.wait(0.06)
+		end
+		p:Destroy()
+	end)
 end
 
 local function attachCarry(player, kind)
@@ -166,15 +203,12 @@ local function setBuyer(index, visible)
 	buyer.Anchored = true
 	buyer.CanCollide = false
 	buyer.Parent = m
-	setSign(buyer, "BUYER - press Q", Color3.fromRGB(255, 230, 120))
-	local bill = buyer:FindFirstChild("Sign")
-	if bill then
-		bill.StudsOffset = Vector3.new(0, 4.2, 0)
-	end
+	setSign(buyer, "BUYER  ·  press Q", Color3.fromRGB(255, 230, 120), Vector3.new(0, 4.2, 0))
 end
 
 local function setPierVisual()
-	local folder = harbor and harbor:FindFirstChild("PierCrates")
+	local h = getHarbor()
+	local folder = h and h:FindFirstChild("PierCrates")
 	if not folder then
 		return
 	end
@@ -190,9 +224,9 @@ local function setPierVisual()
 end
 
 local function setNight(on)
-	Lighting.ClockTime = if on then 0.4 else 16.6
-	Lighting.Brightness = if on then 0.35 else 2.4
-	Lighting.Ambient = if on then Color3.fromRGB(18, 20, 32) else Color3.fromRGB(90, 80, 70)
+	Lighting.ClockTime = if on then 0.4 else 17.2
+	Lighting.Brightness = if on then 0.35 else 2.2
+	Lighting.Ambient = if on then Color3.fromRGB(18, 20, 32) else Color3.fromRGB(70, 64, 58)
 end
 
 local function rollCrate()
@@ -285,21 +319,21 @@ local function doHarvest(player)
 		return
 	end
 	harvestLock[player.UserId] = true
-	task.delay(0.3, function()
+	task.delay(0.25, function()
 		harvestLock[player.UserId] = nil
 	end)
 	if st.carried then
-		notify(player, "Hands full — F at YOUR named stall.")
+		notify(player, "Hands full. F at YOUR named stall.")
 		return
 	end
 	if pierCount < 1 then
-		notify(player, "Pier empty — cargo is unloading.")
+		notify(player, "Pier empty. Wait for cargo.")
 		return
 	end
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	local crate = pile()
-	if not hrp or not crate or (hrp.Position - crate.Position).Magnitude > 28 then
-		notify(player, "Walk onto the PIER with the crates.")
+	if not hrp or not crate or (hrp.Position - crate.Position).Magnitude > 40 then
+		notify(player, "Walk to the crate pile at the end of the PIER.")
 		return
 	end
 	pierCount -= 1
@@ -307,19 +341,22 @@ local function doHarvest(player)
 	scheduleRestock()
 	st.carried = rollCrate()
 	attachCarry(player, st.carried)
-	notify(player, "Got " .. st.carried .. " — F at your stall.")
+	notify(player, "Harvested " .. st.carried .. ". F at your stall.")
 	sound(player, "pick")
 	sync(player)
 end
 
 Remotes.get("Harvest").OnServerEvent:Connect(doHarvest)
-local crate = pile()
-if crate then
-	local prompt = crate:FindFirstChild("HarvestPrompt")
-	if prompt and prompt:IsA("ProximityPrompt") then
-		prompt.Triggered:Connect(doHarvest)
+task.defer(function()
+	waitHarbor()
+	local crate = pile()
+	if crate then
+		local prompt = crate:FindFirstChild("HarvestPrompt")
+		if prompt and prompt:IsA("ProximityPrompt") then
+			prompt.Triggered:Connect(doHarvest)
+		end
 	end
-end
+end)
 
 Remotes.get("StockStall").OnServerEvent:Connect(function(player)
 	local st = states[player.UserId]
@@ -327,7 +364,7 @@ Remotes.get("StockStall").OnServerEvent:Connect(function(player)
 		return
 	end
 	if not st.carried then
-		notify(player, "Harvest first (E on the pier).")
+		notify(player, "E on the pier first.")
 		return
 	end
 	if not st.stallIndex then
@@ -335,12 +372,12 @@ Remotes.get("StockStall").OnServerEvent:Connect(function(player)
 		return
 	end
 	if #st.display >= Config.MaxDisplay then
-		notify(player, "Stall full — Q to sell in DAY.")
+		notify(player, "Stall full. Q to sell during DAY.")
 		return
 	end
 	local floor = stallFloor(st.stallIndex)
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 24 then
+	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 28 then
 		notify(player, "Stand on YOUR stall (your name on the sign).")
 		return
 	end
@@ -350,7 +387,7 @@ Remotes.get("StockStall").OnServerEvent:Connect(function(player)
 	attachCarry(player, nil)
 	refreshDisplay(st.stallIndex, st.display)
 	refreshBuyers()
-	notify(player, "Stocked " .. kind .. " — Q sells in DAY.")
+	notify(player, "Stocked " .. kind .. ". Q sells in DAY.")
 	sound(player, "pick")
 	sync(player)
 end)
@@ -370,7 +407,7 @@ Remotes.get("Sell").OnServerEvent:Connect(function(player)
 	end
 	local floor = stallFloor(st.stallIndex)
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 24 then
+	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 28 then
 		notify(player, "Stand at YOUR stall to sell.")
 		return
 	end
@@ -379,6 +416,7 @@ Remotes.get("Sell").OnServerEvent:Connect(function(player)
 	st.coins += gain
 	refreshDisplay(st.stallIndex, st.display)
 	refreshBuyers()
+	floatText(floor.Position, "+" .. gain .. " coins", Color3.fromRGB(120, 255, 140))
 	notify(player, "Sold " .. kind .. " for " .. gain .. " coins.")
 	sound(player, "sell")
 	sync(player)
@@ -390,7 +428,7 @@ Remotes.get("Steal").OnServerEvent:Connect(function(player)
 		return
 	end
 	if phase ~= "Night" then
-		notify(player, "Steal only after the bell (NIGHT).")
+		notify(player, "Steal only at NIGHT, after the bell.")
 		return
 	end
 	if st.carried then
@@ -440,7 +478,7 @@ Remotes.get("Rebirth").OnServerEvent:Connect(function(player)
 		return
 	end
 	if st.coins < Config.RebirthCost then
-		notify(player, "Need " .. Config.RebirthCost .. " coins. Sell more, then P at the bell.")
+		notify(player, "Need " .. Config.RebirthCost .. " coins, then P at the bell.")
 		return
 	end
 	st.coins = 0
@@ -470,16 +508,16 @@ local function onPlayer(p)
 	assignStall(p)
 	sync(p)
 	local function hook(char)
-		task.wait(0.15)
+		task.wait(0.2)
 		local st = states[p.UserId]
 		local hrp = char:FindFirstChild("HumanoidRootPart")
 		if hrp and st and st.stallIndex then
 			local floor = stallFloor(st.stallIndex)
 			if floor then
-				hrp.CFrame = floor.CFrame + Vector3.new(0, 5, 0)
+				hrp.CFrame = floor.CFrame + Vector3.new(0, 6, 0)
 			end
 		end
-		notify(p, "DAY: E pier  F your stall  Q sell")
+		notify(p, "DAY: E pier   F your stall   Q sell")
 	end
 	p.CharacterAdded:Connect(hook)
 	if p.Character then
@@ -519,7 +557,8 @@ task.spawn(function()
 
 		phase = "Bell"
 		Remotes.get("Phase"):FireAllClients("Bell")
-		local bell = harbor and harbor:FindFirstChild("Bell")
+		local h = getHarbor()
+		local bell = h and h:FindFirstChild("Bell")
 		if bell and bell:IsA("BasePart") then
 			local orig = bell.Color
 			for _ = 1, 6 do
@@ -536,7 +575,6 @@ task.spawn(function()
 		task.wait(Config.BellSeconds)
 
 		phase = "Night"
-		nightIndex += 1
 		setNight(true)
 		refreshBuyers()
 		Remotes.get("Phase"):FireAllClients("Night")
