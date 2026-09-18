@@ -8,8 +8,8 @@ local World = require(script.Parent.Services.World)
 
 Remotes.init()
 World.build()
+World.guardLeftovers()
 
--- Strip leftover tools from the old place (Lantern etc.)
 for _, child in ipairs(StarterPack:GetChildren()) do
 	child:Destroy()
 end
@@ -27,6 +27,11 @@ local stalls: { [number]: Player? } = {}
 local phase = "Day"
 local nightIndex = 0
 local rng = Random.new()
+local pierCount = Config.PierMaxCrates
+local harvestLock: { [number]: boolean } = {}
+local restocking = false
+
+World.setPierGrown(pierCount)
 
 local function notify(p: Player, text: string)
 	Remotes.get("Notify"):FireClient(p, text)
@@ -38,6 +43,22 @@ end
 
 local function multiplier(st: PlayerState): number
 	return 1 + st.rebirths * 0.25
+end
+
+local function harborFolder(): Instance
+	return workspace:WaitForChild("Harbor")
+end
+
+local function pilePart(): BasePart
+	return harborFolder():WaitForChild("CratePile") :: BasePart
+end
+
+local function findStall(index: number): Instance?
+	local folder = harborFolder():FindFirstChild("Stalls")
+	if not folder then
+		return nil
+	end
+	return folder:FindFirstChild("Stall_" .. index)
 end
 
 local function sync(p: Player)
@@ -66,6 +87,7 @@ local function sync(p: Player)
 		display = #st.display,
 		rebirths = st.rebirths,
 		night = nightIndex,
+		need = Config.RebirthCost,
 	})
 end
 
@@ -102,15 +124,47 @@ local function stripTools(p: Player)
 	end
 end
 
+local function refreshBuyers()
+	for i = 1, Config.MaxStalls do
+		local owner = stalls[i]
+		local show = false
+		if phase == "Day" and owner then
+			local st = states[owner.UserId]
+			show = st ~= nil and #st.display > 0
+		end
+		World.setBuyer(i, show)
+	end
+end
+
 local function assignStall(p: Player)
 	for i = 1, Config.MaxStalls do
 		if stalls[i] == nil then
 			stalls[i] = p
 			states[p.UserId].stallIndex = i
-			World.setStallOwner(i, p.DisplayName)
+			World.setStallOwner(i, p.DisplayName .. "'s stall")
 			return
 		end
 	end
+end
+
+local function scheduleRestock()
+	if restocking then
+		return
+	end
+	restocking = true
+	task.spawn(function()
+		while pierCount < Config.PierMaxCrates do
+			task.wait(Config.GrowSeconds)
+			pierCount += 1
+			World.setPierGrown(pierCount)
+			if pierCount == 1 then
+				for _, p in ipairs(Players:GetPlayers()) do
+					notify(p, "Pier cargo is ready — E to harvest.")
+				end
+			end
+		end
+		restocking = false
+	end)
 end
 
 local function doHarvest(player: Player)
@@ -118,17 +172,33 @@ local function doHarvest(player: Player)
 	if not st then
 		return
 	end
+	if harvestLock[player.UserId] then
+		return
+	end
+	harvestLock[player.UserId] = true
+	task.delay(0.35, function()
+		harvestLock[player.UserId] = nil
+	end)
 	if st.carried then
 		notify(player, "Hands full — press F at YOUR stall.")
 		return
 	end
+	if pierCount < 1 then
+		notify(player, "Pier is empty — cargo is still being unloaded.")
+		return
+	end
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hrp or (hrp.Position - Vector3.new(0, 3.4, 62)).Magnitude > 24 then
+	local pile = pilePart()
+	if not hrp or (hrp.Position - pile.Position).Magnitude > 24 then
 		notify(player, "Walk onto the PIER (long dock with crates).")
 		return
 	end
+	pierCount -= 1
+	World.setPierGrown(pierCount)
+	scheduleRestock()
 	st.carried = rollCrate()
+	World.attachCarry(player, st.carried)
 	notify(player, "Harvested " .. st.carried .. " — F at your stall to stock.")
 	sound(player, "pick")
 	sync(player)
@@ -136,31 +206,41 @@ end
 
 Remotes.get("Harvest").OnServerEvent:Connect(doHarvest)
 
-local harbor = workspace:WaitForChild("Harbor")
-local pile = harbor:WaitForChild("CratePile")
+local pile = pilePart()
 local prompt = pile:WaitForChild("HarvestPrompt") :: ProximityPrompt
 prompt.Triggered:Connect(doHarvest)
 
 Remotes.get("StockStall").OnServerEvent:Connect(function(player)
 	local st = states[player.UserId]
-	if not st or not st.carried or not st.stallIndex then
+	if not st then
+		return
+	end
+	if not st.carried then
+		notify(player, "Harvest a crate first (E on the pier).")
+		return
+	end
+	if not st.stallIndex then
+		notify(player, "No stall assigned.")
 		return
 	end
 	if #st.display >= Config.MaxDisplay then
-		notify(player, "Stall full — press Q to sell.")
+		notify(player, "Stall full — press Q to sell during DAY.")
 		return
 	end
-	local stall = harbor.Stalls:FindFirstChild("Stall_" .. st.stallIndex)
-	local floor = stall and stall.PrimaryPart
+	local stall = findStall(st.stallIndex)
+	local floor = stall and stall:FindFirstChild("Floor") :: BasePart?
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 20 then
-		notify(player, "Stand on YOUR stall floor.")
+	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 22 then
+		notify(player, "Stand on YOUR stall floor (the one with your name).")
 		return
 	end
-	table.insert(st.display, st.carried)
-	notify(player, "Stocked " .. st.carried .. " — Q sells in DAY.")
+	local kind = st.carried
+	table.insert(st.display, kind)
 	st.carried = nil
+	World.attachCarry(player, nil)
 	World.refreshDisplay(st.stallIndex, st.display)
+	refreshBuyers()
+	notify(player, "Stocked " .. kind .. " — Q sells to the gold buyer in DAY.")
 	sound(player, "pick")
 	sync(player)
 end)
@@ -178,10 +258,19 @@ Remotes.get("Sell").OnServerEvent:Connect(function(player)
 		notify(player, "Stock the stall first (F).")
 		return
 	end
+	local stall = findStall(st.stallIndex)
+	local floor = stall and stall:FindFirstChild("Floor") :: BasePart?
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not hrp or not floor or (hrp.Position - floor.Position).Magnitude > 22 then
+		notify(player, "Stand at YOUR stall to sell (gold buyer).")
+		return
+	end
 	local kind = table.remove(st.display, 1) :: string
 	local gain = math.floor((Config.CrateValue[kind] or 8) * multiplier(st))
 	st.coins += gain
 	World.refreshDisplay(st.stallIndex, st.display)
+	refreshBuyers()
+	World.floatText(floor.Position, "+" .. gain .. " coins", Color3.fromRGB(120, 255, 140))
 	notify(player, "Sold " .. kind .. " for " .. gain .. " coins.")
 	sound(player, "sell")
 	sync(player)
@@ -210,8 +299,8 @@ Remotes.get("Steal").OnServerEvent:Connect(function(player)
 		if other ~= player then
 			local ost = states[other.UserId]
 			if ost and ost.stallIndex and #ost.display > 0 then
-				local stall = harbor.Stalls:FindFirstChild("Stall_" .. ost.stallIndex)
-				local floor = stall and stall.PrimaryPart
+				local stall = findStall(ost.stallIndex)
+				local floor = stall and stall:FindFirstChild("Floor") :: BasePart?
 				if floor then
 					local d = (hrp.Position - floor.Position).Magnitude
 					if d < bestDist then
@@ -229,9 +318,11 @@ Remotes.get("Steal").OnServerEvent:Connect(function(player)
 	local ost = states[bestPlayer.UserId]
 	local kind = table.remove(ost.display, 1) :: string
 	st.carried = kind
+	World.attachCarry(player, kind)
 	if ost.stallIndex then
 		World.refreshDisplay(ost.stallIndex, ost.display)
 	end
+	refreshBuyers()
 	notify(player, "Stole " .. kind .. " from " .. bestPlayer.DisplayName)
 	notify(bestPlayer, player.DisplayName .. " robbed your stall!")
 	sound(player, "pick")
@@ -245,16 +336,18 @@ Remotes.get("Rebirth").OnServerEvent:Connect(function(player)
 		return
 	end
 	if st.coins < Config.RebirthCost then
-		notify(player, "Need " .. Config.RebirthCost .. " coins to rebirth.")
+		notify(player, "Need " .. Config.RebirthCost .. " coins to rebirth. (P at the bell)")
 		return
 	end
 	st.coins = 0
 	st.rebirths += 1
 	st.display = {}
 	st.carried = nil
+	World.attachCarry(player, nil)
 	if st.stallIndex then
 		World.refreshDisplay(st.stallIndex, st.display)
 	end
+	refreshBuyers()
 	notify(player, "Rebirth " .. st.rebirths .. " — payout x" .. string.format("%.2f", multiplier(st)))
 	sync(player)
 end)
@@ -270,18 +363,31 @@ local function onPlayer(p: Player)
 	assignStall(p)
 	sync(p)
 	stripTools(p)
-	p.CharacterAdded:Connect(function(char)
-		task.wait(0.15)
+	local function hookCharacter(char: Model)
+		task.wait(0.2)
 		stripTools(p)
+		local st = states[p.UserId]
 		local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local idx = states[p.UserId] and states[p.UserId].stallIndex
-		if hrp and idx then
-			local stall = harbor.Stalls:FindFirstChild("Stall_" .. idx)
-			if stall and stall.PrimaryPart then
-				hrp.CFrame = stall.PrimaryPart.CFrame + Vector3.new(0, 5, 0)
+		if hrp and st and st.stallIndex then
+			local stall = findStall(st.stallIndex)
+			local floor = stall and stall:FindFirstChild("Floor") :: BasePart?
+			if floor then
+				hrp.CFrame = floor.CFrame + Vector3.new(0, 5, 0)
 			end
 		end
-	end)
+		if st then
+			World.attachCarry(p, st.carried)
+		end
+		if phase == "Night" then
+			notify(p, "NIGHT — R near another stall to steal.")
+		else
+			notify(p, "DAY loop: E pier  →  F your stall  →  Q gold buyer")
+		end
+	end
+	p.CharacterAdded:Connect(hookCharacter)
+	if p.Character then
+		task.spawn(hookCharacter, p.Character)
+	end
 end
 
 Players.PlayerAdded:Connect(onPlayer)
@@ -294,6 +400,7 @@ Players.PlayerRemoving:Connect(function(p)
 		stalls[st.stallIndex] = nil
 		World.setStallOwner(st.stallIndex, "Empty stall")
 		World.refreshDisplay(st.stallIndex, {})
+		World.setBuyer(st.stallIndex, false)
 	end
 	states[p.UserId] = nil
 end)
@@ -302,13 +409,16 @@ task.spawn(function()
 	while true do
 		phase = "Day"
 		World.setNight(false)
+		refreshBuyers()
 		Remotes.get("Phase"):FireAllClients("Day")
 		for _, p in ipairs(Players:GetPlayers()) do
 			notify(p, "DAY — harvest (E), stock (F), sell (Q).")
+			sync(p)
 		end
 		task.wait(Config.DaySeconds)
 
 		phase = "Bell"
+		World.ringBell()
 		Remotes.get("Phase"):FireAllClients("Bell")
 		for _, p in ipairs(Players:GetPlayers()) do
 			sound(p, "bell")
@@ -319,6 +429,7 @@ task.spawn(function()
 		phase = "Night"
 		nightIndex += 1
 		World.setNight(true)
+		refreshBuyers()
 		Remotes.get("Phase"):FireAllClients("Night")
 		for _, p in ipairs(Players:GetPlayers()) do
 			sound(p, "night")
@@ -329,4 +440,4 @@ task.spawn(function()
 	end
 end)
 
-print("[Last Bell] Harbor ready — leftover map wiped")
+print("[Last Bell] Harbor ready — leftover map wiped, ring on the dock")

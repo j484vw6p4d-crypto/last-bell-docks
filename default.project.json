@@ -19,8 +19,18 @@
         "Client": { "$path": "src/StarterPlayer/StarterPlayerScripts/Client.client.lua" }
       }
     },
-    "Workspace": { "$className": "Workspace" },
-    "Lighting": { "$className": "Lighting" },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$ignoreUnknownInstances": true
+    },
+    "StarterPack": {
+      "$className": "StarterPack",
+      "$ignoreUnknownInstances": false
+    },
     "SoundService": { "$className": "SoundService" }
   }
 }

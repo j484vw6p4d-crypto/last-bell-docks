@@ -4,7 +4,7 @@ This is a **friends-only beta**, not a public launch.
 
 ## What beta means here
 - Loop works: harvest → stock → sell by day → steal at night → rebirth
-- Map is still generated parts
+- Map is still generated parts (circular dock, pier, bell, 20 stalls)
 - Data does **not** persist yet (leaving wipes coins)
 - Keep the experience **Limited + Friends**
 
@@ -21,7 +21,12 @@ rojo serve
 
 3. Studio → **File → Open from Roblox** → **Last Bell** (not Girgaax2's Place).
 4. Plugins → Rojo → Connect → Accept.
-5. Press Play. Confirm HUD says **BETA 0.1** and you spawn at a stall.
+5. Press Play. Confirm:
+   - Water + round wooden dock (no village houses / mountains)
+   - Gold bell in the center
+   - Pier with crates
+   - You spawn on a stall with your name
+   - HUD title **Last Bell**
 6. Stop Play.
 7. **File → Publish to Roblox** (same Last Bell place).
 8. Dashboard: Last Bell stays **Limited**, Friends + Playtesters on.

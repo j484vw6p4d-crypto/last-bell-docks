@@ -1,16 +1,12 @@
 --!strict
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local Config = require(game.ReplicatedStorage.Shared.Config)
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Config"))
 
 local World = {}
 
-local KEEP = {
-	Camera = true,
-	Terrain = true,
-}
-
-local function part(name, size, cf, color, parent, mat)
+local function part(name: string, size: Vector3, cf: CFrame, color: Color3, parent: Instance, mat: Enum.Material?): BasePart
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -19,18 +15,27 @@ local function part(name, size, cf, color, parent, mat)
 	p.Material = mat or Enum.Material.SmoothPlastic
 	p.Anchored = true
 	p.CanCollide = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
 end
 
-local function labelOn(adornee: BasePart, text: string, offset: Vector3, color: Color3?)
+local function labelOn(adornee: BasePart, text: string, offset: Vector3, color: Color3?): TextLabel
+	local old = adornee:FindFirstChild("Sign")
+	if old then
+		old:Destroy()
+	end
 	local bill = Instance.new("BillboardGui")
 	bill.Name = "Sign"
-	bill.Size = UDim2.fromOffset(220, 36)
+	bill.Size = UDim2.fromOffset(260, 40)
 	bill.StudsOffset = offset
 	bill.AlwaysOnTop = true
+	bill.MaxDistance = 110
+	bill.LightInfluence = 0
 	bill.Parent = adornee
 	local t = Instance.new("TextLabel")
+	t.Name = "Text"
 	t.Size = UDim2.fromScale(1, 1)
 	t.BackgroundTransparency = 1
 	t.Text = text
@@ -41,18 +46,108 @@ local function labelOn(adornee: BasePart, text: string, offset: Vector3, color: 
 	return t
 end
 
-function World.wipe()
-	local ok, err = pcall(function()
-		Workspace.Terrain:Clear()
+local function isCharacterModel(inst: Instance): boolean
+	if inst:IsA("Model") and inst:FindFirstChildOfClass("Humanoid") then
+		return true
+	end
+	return Players:GetPlayerFromCharacter(inst) ~= nil
+end
+
+local function destroyLeftover(inst: Instance)
+	if inst:IsA("Camera") or inst:IsA("Terrain") then
+		return
+	end
+	if inst.Name == "Harbor" then
+		return
+	end
+	if isCharacterModel(inst) then
+		return
+	end
+	pcall(function()
+		inst:Destroy()
 	end)
-	if not ok then
-		warn("[Last Bell] Terrain:Clear failed", err)
+end
+
+function World.wipe()
+	pcall(function()
+		local terrain = Workspace.Terrain
+		terrain:Clear()
+		terrain:FillBlock(CFrame.new(0, 0, 0), Vector3.new(4096, 1024, 4096), Enum.Material.Air)
+		terrain:FillBlock(CFrame.new(0, -10, 0), Vector3.new(512, 16, 512), Enum.Material.Water)
+	end)
+
+	local oldHarbor = Workspace:FindFirstChild("Harbor")
+	if oldHarbor then
+		pcall(function()
+			oldHarbor:Destroy()
+		end)
 	end
+
 	for _, child in ipairs(Workspace:GetChildren()) do
-		if not KEEP[child.Name] and not child:IsA("Terrain") and not child:IsA("Camera") then
-			child:Destroy()
-		end
+		destroyLeftover(child)
 	end
+
+	for _, child in ipairs(Lighting:GetChildren()) do
+		pcall(function()
+			child:Destroy()
+		end)
+	end
+
+	local starterPack = game:GetService("StarterPack")
+	for _, child in ipairs(starterPack:GetChildren()) do
+		pcall(function()
+			child:Destroy()
+		end)
+	end
+end
+
+function World.guardLeftovers()
+	for _, child in ipairs(Workspace:GetChildren()) do
+		destroyLeftover(child)
+	end
+	local deadline = os.clock() + 10
+	local conn: RBXScriptConnection
+	conn = Workspace.ChildAdded:Connect(function(child)
+		task.delay(0.45, function()
+			if os.clock() > deadline then
+				conn:Disconnect()
+				return
+			end
+			if child.Parent == nil then
+				return
+			end
+			destroyLeftover(child)
+		end)
+	end)
+	task.delay(2, function()
+		for _, child in ipairs(Workspace:GetChildren()) do
+			destroyLeftover(child)
+		end
+	end)
+end
+
+local function applySky()
+	local sky = Instance.new("Sky")
+	sky.Name = "HarborSky"
+	sky.CelestialBodiesShown = true
+	sky.StarCount = 3000
+	sky.Parent = Lighting
+
+	local atm = Instance.new("Atmosphere")
+	atm.Name = "HarborFog"
+	atm.Density = 0.42
+	atm.Offset = 0.08
+	atm.Color = Color3.fromRGB(72, 92, 118)
+	atm.Decay = Color3.fromRGB(28, 36, 52)
+	atm.Glare = 0.15
+	atm.Haze = 1.6
+	atm.Parent = Lighting
+
+	local cc = Instance.new("ColorCorrectionEffect")
+	cc.Name = "HarborColor"
+	cc.Saturation = 0.08
+	cc.Contrast = 0.05
+	cc.Parent = Lighting
 end
 
 function World.build()
@@ -62,44 +157,67 @@ function World.build()
 	folder.Name = "Harbor"
 	folder.Parent = Workspace
 
-	part("Water", Vector3.new(500, 4, 500), CFrame.new(0, -3, 0), Color3.fromRGB(18, 48, 78), folder, Enum.Material.Glass)
-	part("Dock", Vector3.new(90, 2, 90), CFrame.new(0, 1, 0), Color3.fromRGB(72, 48, 28), folder, Enum.Material.Wood)
+	applySky()
 
-	local pier = part("Pier", Vector3.new(22, 1.6, 56), CFrame.new(0, 1.3, 48), Color3.fromRGB(96, 68, 38), folder, Enum.Material.Wood)
-	labelOn(pier, "PIER — press E to harvest", Vector3.new(0, 8, 0), Color3.fromRGB(255, 220, 120))
+	local water = part("Water", Vector3.new(700, 6, 700), CFrame.new(0, -4, 0), Color3.fromRGB(16, 46, 78), folder, Enum.Material.Glass)
+	water.Transparency = 0.32
+	water.CanCollide = true
 
-	local crateAnchor = part("CratePile", Vector3.new(6, 3, 6), CFrame.new(0, 3.4, 62), Color3.fromRGB(160, 110, 60), folder, Enum.Material.Wood)
-	labelOn(crateAnchor, "Cargo crates", Vector3.new(0, 4, 0), Color3.fromRGB(255, 240, 200))
+	local dock = part("Dock", Vector3.new(2.4, 210, 210), CFrame.new(0, 1.2, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(92, 62, 36), folder, Enum.Material.Wood)
+	dock.Shape = Enum.PartType.Cylinder
+
+	local pier = part("Pier", Vector3.new(18, 1.8, 70), CFrame.new(0, 1.3, 128), Color3.fromRGB(112, 78, 44), folder, Enum.Material.Wood)
+	labelOn(pier, "PIER — press E to harvest", Vector3.new(0, 9, 0), Color3.fromRGB(255, 220, 120))
+
+	for i = -1, 1, 2 do
+		part("PierRail", Vector3.new(0.6, 2.4, 70), CFrame.new(i * 9, 2.8, 128), Color3.fromRGB(72, 50, 30), folder, Enum.Material.Wood)
+	end
+
+	local crateAnchor = part("CratePile", Vector3.new(8, 1, 8), CFrame.new(0, 2.4, 154), Color3.fromRGB(70, 48, 28), folder, Enum.Material.Wood)
+	labelOn(crateAnchor, "CARGO — E harvest", Vector3.new(0, 8, 0), Color3.fromRGB(255, 240, 180))
 
 	local harvest = Instance.new("ProximityPrompt")
 	harvest.Name = "HarvestPrompt"
 	harvest.ObjectText = "Pier cargo"
-	harvest.ActionText = "Harvest crate (E)"
-	harvest.HoldDuration = 0.25
-	harvest.MaxActivationDistance = 16
+	harvest.ActionText = "Harvest crate"
+	harvest.HoldDuration = 0.2
+	harvest.MaxActivationDistance = 18
 	harvest.RequiresLineOfSight = false
+	harvest.KeyboardKeyCode = Enum.KeyCode.E
 	harvest.Parent = crateAnchor
 
-	part("BellTower", Vector3.new(8, 28, 8), CFrame.new(0, 15, -22), Color3.fromRGB(42, 42, 58), folder)
-	part("Bell", Vector3.new(6, 3, 6), CFrame.new(0, 30, -22), Color3.fromRGB(220, 180, 50), folder, Enum.Material.Neon)
-	labelOn(workspace.Harbor.BellTower, "THE BELL", Vector3.new(0, 18, 0), Color3.fromRGB(255, 210, 80))
+	local pierCrates = Instance.new("Folder")
+	pierCrates.Name = "PierCrates"
+	pierCrates.Parent = folder
+	local offsets = {
+		Vector3.new(-2.2, 1.4, -2),
+		Vector3.new(2.2, 1.4, -2),
+		Vector3.new(-2.2, 1.4, 2),
+		Vector3.new(2.2, 1.4, 2),
+		Vector3.new(0, 3.4, 0),
+		Vector3.new(0, 1.4, 0),
+	}
+	for i, off in ipairs(offsets) do
+		local box = part("Crate_" .. i, Vector3.new(2.6, 2.2, 2.6), crateAnchor.CFrame * CFrame.new(off), Color3.fromRGB(168, 118, 64), pierCrates, Enum.Material.Wood)
+		box.CanCollide = false
+		box:SetAttribute("FullSize", box.Size)
+	end
+
+	part("TowerBase", Vector3.new(16, 2, 16), CFrame.new(0, 2.4, 0), Color3.fromRGB(48, 48, 62), folder)
+	part("BellTower", Vector3.new(8, 30, 8), CFrame.new(0, 17, 0), Color3.fromRGB(42, 42, 58), folder)
+	part("TowerCap", Vector3.new(12, 2, 12), CFrame.new(0, 33, 0), Color3.fromRGB(36, 36, 50), folder)
+	local bell = part("Bell", Vector3.new(7, 4, 7), CFrame.new(0, 30, 0), Color3.fromRGB(228, 186, 52), folder, Enum.Material.Neon)
+	labelOn(bell, "THE BELL  ·  P rebirth at 500", Vector3.new(0, 8, 0), Color3.fromRGB(255, 220, 90))
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "SpawnLocation"
-	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.CFrame = CFrame.new(0, 2.6, -6)
+	spawn.Size = Vector3.new(12, 1, 12)
+	spawn.CFrame = CFrame.new(0, 2.8, 18)
 	spawn.Anchored = true
 	spawn.Duration = 0
 	spawn.Neutral = true
+	spawn.BrickColor = BrickColor.new("Dark orange")
 	spawn.Parent = folder
-
-	Lighting.ClockTime = 16.8
-	Lighting.Brightness = 2.2
-	Lighting.FogStart = 60
-	Lighting.FogEnd = 240
-	Lighting.FogColor = Color3.fromRGB(30, 42, 62)
-	Lighting.Ambient = Color3.fromRGB(70, 70, 90)
-	Lighting.OutdoorAmbient = Color3.fromRGB(90, 90, 110)
 
 	local stalls = Instance.new("Folder")
 	stalls.Name = "Stalls"
@@ -107,49 +225,88 @@ function World.build()
 
 	for i = 1, Config.MaxStalls do
 		local a = ((i - 1) / Config.MaxStalls) * math.pi * 2
-		local pos = Vector3.new(math.cos(a) * Config.RingRadius, 2, math.sin(a) * Config.RingRadius)
-		local look = CFrame.new(pos, Vector3.new(0, 2, 0))
+		local pos = Vector3.new(math.cos(a) * Config.RingRadius, 2.4, math.sin(a) * Config.RingRadius)
+		local look = CFrame.lookAt(pos, Vector3.new(0, 2.4, 0))
 		local m = Instance.new("Model")
 		m.Name = "Stall_" .. i
 		m.Parent = stalls
-		local floor = part("Floor", Vector3.new(16, 1, 16), look, Color3.fromRGB(52, 40, 32), m, Enum.Material.Wood)
+		local floor = part("Floor", Vector3.new(16, 1, 16), look, Color3.fromRGB(58, 42, 30), m, Enum.Material.Wood)
 		m.PrimaryPart = floor
-		part("Counter", Vector3.new(10, 2, 2), look * CFrame.new(0, 1.5, 5), Color3.fromRGB(92, 70, 48), m, Enum.Material.Wood)
-		local lamp = part("Lamp", Vector3.new(1.2, 1.2, 1.2), look * CFrame.new(0, 8, 0), Color3.fromRGB(255, 200, 120), m, Enum.Material.Neon)
+		part("Back", Vector3.new(16, 8, 0.7), look * CFrame.new(0, 4.5, 7.6), Color3.fromRGB(86, 60, 38), m, Enum.Material.Wood)
+		part("Roof", Vector3.new(17, 0.7, 17), look * CFrame.new(0, 9.2, 0), Color3.fromRGB(72, 48, 30), m, Enum.Material.Wood)
+		part("Counter", Vector3.new(10, 2, 2.2), look * CFrame.new(0, 1.6, -6.2), Color3.fromRGB(110, 82, 52), m, Enum.Material.Wood)
+		local lamp = part("Lamp", Vector3.new(1.4, 1.4, 1.4), look * CFrame.new(0, 8.2, 0), Color3.fromRGB(255, 210, 130), m, Enum.Material.Neon)
 		local pl = Instance.new("PointLight")
-		pl.Brightness = 2
-		pl.Range = 24
+		pl.Name = "StallLight"
+		pl.Brightness = 1.6
+		pl.Range = 28
+		pl.Color = Color3.fromRGB(255, 210, 140)
 		pl.Parent = lamp
 		local display = Instance.new("Folder")
 		display.Name = "Display"
 		display.Parent = m
-		labelOn(floor, "Empty stall", Vector3.new(0, 6, 0), Color3.fromRGB(230, 230, 230))
+		labelOn(floor, "Empty stall", Vector3.new(0, 7, 0), Color3.fromRGB(230, 230, 230))
 	end
 
+	World.setNight(false)
 	return folder
 end
 
 function World.setNight(on: boolean)
-	Lighting.ClockTime = if on then 21.5 else 16.8
-	Lighting.FogEnd = if on then 130 else 250
-	Lighting.Brightness = if on then 1.1 else 2.2
+	Lighting.ClockTime = if on then 0.4 else 16.6
+	Lighting.Brightness = if on then 0.4 else 2.4
+	Lighting.FogStart = if on then 18 else 40
+	Lighting.FogEnd = if on then 110 else 220
+	Lighting.FogColor = if on then Color3.fromRGB(8, 10, 22) else Color3.fromRGB(70, 92, 118)
+	Lighting.Ambient = if on then Color3.fromRGB(18, 20, 32) else Color3.fromRGB(78, 72, 68)
+	Lighting.OutdoorAmbient = if on then Color3.fromRGB(22, 26, 42) else Color3.fromRGB(118, 108, 96)
+	Lighting.ColorShift_Top = if on then Color3.fromRGB(40, 50, 90) else Color3.fromRGB(255, 210, 160)
+
+	local atm = Lighting:FindFirstChild("HarborFog")
+	if atm and atm:IsA("Atmosphere") then
+		atm.Density = if on then 0.55 else 0.38
+		atm.Haze = if on then 2.2 else 1.4
+		atm.Color = if on then Color3.fromRGB(20, 24, 40) else Color3.fromRGB(72, 92, 118)
+	end
+
+	local harbor = Workspace:FindFirstChild("Harbor")
+	if not harbor then
+		return
+	end
+	local stalls = harbor:FindFirstChild("Stalls")
+	if not stalls then
+		return
+	end
+	for _, stall in ipairs(stalls:GetChildren()) do
+		local lamp = stall:FindFirstChild("Lamp")
+		local light = lamp and lamp:FindFirstChild("StallLight")
+		if light and light:IsA("PointLight") then
+			light.Brightness = if on then 3.4 else 1.4
+			light.Range = if on then 36 else 24
+		end
+		if lamp and lamp:IsA("BasePart") then
+			lamp.Color = if on then Color3.fromRGB(255, 170, 80) else Color3.fromRGB(255, 210, 130)
+		end
+	end
 end
 
 function World.setStallOwner(index: number, name: string)
-	local stall = Workspace:FindFirstChild("Harbor") and Workspace.Harbor.Stalls:FindFirstChild("Stall_" .. index)
+	local harbor = Workspace:FindFirstChild("Harbor")
+	local stalls = harbor and harbor:FindFirstChild("Stalls")
+	local stall = stalls and stalls:FindFirstChild("Stall_" .. index)
 	if not stall then
 		return
 	end
 	local floor = stall:FindFirstChild("Floor")
-	local bill = floor and floor:FindFirstChild("Sign")
-	local lab = bill and bill:FindFirstChildOfClass("TextLabel")
-	if lab then
-		lab.Text = name .. "'s stall"
+	if floor and floor:IsA("BasePart") then
+		labelOn(floor, name, Vector3.new(0, 7, 0), Color3.fromRGB(255, 230, 180))
 	end
 end
 
 function World.refreshDisplay(index: number, kinds: { string })
-	local stall = Workspace:FindFirstChild("Harbor") and Workspace.Harbor.Stalls:FindFirstChild("Stall_" .. index)
+	local harbor = Workspace:FindFirstChild("Harbor")
+	local stalls = harbor and harbor:FindFirstChild("Stalls")
+	local stall = stalls and stalls:FindFirstChild("Stall_" .. index)
 	if not stall then
 		return
 	end
@@ -158,7 +315,7 @@ function World.refreshDisplay(index: number, kinds: { string })
 		return
 	end
 	folder:ClearAllChildren()
-	local floor = stall.PrimaryPart
+	local floor = stall:FindFirstChild("Floor") :: BasePart?
 	if not floor then
 		return
 	end
@@ -171,10 +328,140 @@ function World.refreshDisplay(index: number, kinds: { string })
 		box.CanCollide = false
 		box.Color = color
 		box.Material = Enum.Material.Wood
-		box.CFrame = floor.CFrame * CFrame.new(-4 + (i - 1) * 2.8, 2.2, -2)
+		box.CFrame = floor.CFrame * CFrame.new(-4 + (i - 1) * 2.8, 2.4, 1)
 		box.Parent = folder
 		labelOn(box, kind, Vector3.new(0, 2.2, 0), Color3.new(1, 1, 1))
 	end
+end
+
+function World.setBuyer(index: number, visible: boolean)
+	local harbor = Workspace:FindFirstChild("Harbor")
+	local stalls = harbor and harbor:FindFirstChild("Stalls")
+	local stall = stalls and stalls:FindFirstChild("Stall_" .. index)
+	if not stall then
+		return
+	end
+	local old = stall:FindFirstChild("Buyer")
+	if old then
+		old:Destroy()
+	end
+	if not visible then
+		return
+	end
+	local floor = stall:FindFirstChild("Floor") :: BasePart?
+	if not floor then
+		return
+	end
+	local buyer = part("Buyer", Vector3.new(2.2, 5.2, 2.2), floor.CFrame * CFrame.new(5.2, 3.4, -4.5), Color3.fromRGB(255, 196, 64), stall, Enum.Material.Neon)
+	buyer.CanCollide = false
+	labelOn(buyer, "BUYER — press Q to sell", Vector3.new(0, 4.2, 0), Color3.fromRGB(255, 230, 120))
+end
+
+function World.setPierGrown(count: number)
+	local harbor = Workspace:FindFirstChild("Harbor")
+	local folder = harbor and harbor:FindFirstChild("PierCrates")
+	if not folder then
+		return
+	end
+	local kids = folder:GetChildren()
+	table.sort(kids, function(a, b)
+		return a.Name < b.Name
+	end)
+	for i, child in ipairs(kids) do
+		if child:IsA("BasePart") then
+			local full = child:GetAttribute("FullSize")
+			local on = i <= count
+			child.Transparency = if on then 0 else 0.75
+			if typeof(full) == "Vector3" then
+				child.Size = if on then full else Vector3.new(1.1, 1.1, 1.1)
+			end
+		end
+	end
+	local pile = harbor and harbor:FindFirstChild("CratePile")
+	if pile and pile:IsA("BasePart") then
+		local sign = pile:FindFirstChild("Sign")
+		local lab = sign and sign:FindFirstChild("Text")
+		if lab and lab:IsA("TextLabel") then
+			if count > 0 then
+				lab.Text = "CARGO x" .. count .. " — E harvest"
+			else
+				lab.Text = "Unloading… wait for crates"
+			end
+		end
+	end
+end
+
+function World.attachCarry(player: Player, kind: string?)
+	local char = player.Character
+	if not char then
+		return
+	end
+	local old = char:FindFirstChild("CarriedCrate")
+	if old then
+		old:Destroy()
+	end
+	if not kind then
+		return
+	end
+	local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not hrp then
+		return
+	end
+	local box = Instance.new("Part")
+	box.Name = "CarriedCrate"
+	box.Size = Vector3.new(1.8, 1.6, 1.8)
+	box.Color = Config.CrateColor[kind] or Color3.fromRGB(160, 110, 60)
+	box.Material = Enum.Material.Wood
+	box.Massless = true
+	box.CanCollide = false
+	box.Anchored = false
+	box.CFrame = hrp.CFrame * CFrame.new(0, 2.1, -1.5)
+	box.Parent = char
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = hrp
+	weld.Part1 = box
+	weld.Parent = box
+	labelOn(box, kind, Vector3.new(0, 1.5, 0), Color3.new(1, 1, 1))
+end
+
+function World.floatText(at: Vector3, text: string, color: Color3)
+	local harbor = Workspace:FindFirstChild("Harbor")
+	if not harbor then
+		return
+	end
+	local p = Instance.new("Part")
+	p.Name = "FloatText"
+	p.Anchored = true
+	p.CanCollide = false
+	p.Transparency = 1
+	p.Size = Vector3.new(1, 1, 1)
+	p.Position = at + Vector3.new(0, 6, 0)
+	p.Parent = harbor
+	labelOn(p, text, Vector3.zero, color)
+	task.spawn(function()
+		for _ = 1, 14 do
+			p.Position = p.Position + Vector3.new(0, 0.32, 0)
+			task.wait(0.07)
+		end
+		p:Destroy()
+	end)
+end
+
+function World.ringBell()
+	local harbor = Workspace:FindFirstChild("Harbor")
+	local bell = harbor and harbor:FindFirstChild("Bell")
+	if not (bell and bell:IsA("BasePart")) then
+		return
+	end
+	local orig = bell.Color
+	task.spawn(function()
+		for _ = 1, 6 do
+			bell.Color = Color3.fromRGB(255, 255, 140)
+			task.wait(0.16)
+			bell.Color = orig
+			task.wait(0.16)
+		end
+	end)
 end
 
 return World

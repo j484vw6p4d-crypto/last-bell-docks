@@ -1,13 +1,14 @@
 --!strict
 local Config = {}
 Config.MaxStalls = 20
-Config.RingRadius = 72
+Config.RingRadius = 70
 Config.DaySeconds = 50
 Config.NightSeconds = 40
 Config.BellSeconds = 4
 Config.StartingCoins = 0
 Config.RebirthCost = 500
-Config.GrowSeconds = 8
+Config.GrowSeconds = 6
+Config.PierMaxCrates = 6
 Config.MaxDisplay = 4
 Config.CrateValue = { Wood = 8, Spice = 20, Silk = 45, Relic = 120 }
 Config.CrateWeight = { Wood = 50, Spice = 30, Silk = 15, Relic = 5 }
