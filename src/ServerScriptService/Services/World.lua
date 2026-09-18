@@ -42,7 +42,7 @@ local function labelOn(adornee: BasePart, text: string, offset: Vector3, color: 
 	t.BackgroundTransparency = 1
 	t.Text = text
 	t.TextColor3 = color or Color3.new(1, 1, 1)
-	t.Font = Enum.Font.GothamBold
+	t.Font = Enum.Font.SourceSansBold
 	t.TextScaled = true
 	t.Parent = bill
 	return t
@@ -52,7 +52,7 @@ local function keepInstance(inst: Instance): boolean
 	if inst:IsA("Camera") or inst:IsA("Terrain") then
 		return true
 	end
-	if inst.Name == "Harbor" then
+	if inst.Name == "Harbor" or inst.Name == "BootFloor" or inst.Name == "BootSpawn" then
 		return true
 	end
 	if Players:GetPlayerFromCharacter(inst) ~= nil then
@@ -61,53 +61,30 @@ local function keepInstance(inst: Instance): boolean
 	return false
 end
 
-local function destroyLeftover(inst: Instance)
-	if keepInstance(inst) then
-		return
-	end
-	pcall(function()
-		inst:Destroy()
-	end)
-end
-
 function World.wipe()
 	print("[Last Bell] Wiping leftover map")
 	pcall(function()
 		Workspace.Terrain:Clear()
 	end)
 	for _, child in ipairs(Workspace:GetChildren()) do
-		destroyLeftover(child)
-	end
-	for _, child in ipairs(Lighting:GetChildren()) do
-		pcall(function()
-			child:Destroy()
-		end)
+		if not keepInstance(child) then
+			pcall(function()
+				child:Destroy()
+			end)
+		end
 	end
 end
 
 function World.guardLeftovers()
-	for _, child in ipairs(Workspace:GetChildren()) do
-		destroyLeftover(child)
-	end
-	local deadline = os.clock() + 8
-	local conn: RBXScriptConnection? = nil
-	conn = Workspace.ChildAdded:Connect(function(child)
-		task.delay(0.4, function()
-			if os.clock() > deadline then
-				if conn then
-					conn:Disconnect()
-				end
-				return
-			end
-			if child.Parent == nil then
-				return
-			end
-			destroyLeftover(child)
-		end)
-	end)
+	-- no-op: ChildAdded wipes were deleting the dock during Play
 end
 
 local function applySky()
+	for _, child in ipairs(Lighting:GetChildren()) do
+		if child.Name == "HarborSky" or child.Name == "HarborFog" then
+			child:Destroy()
+		end
+	end
 	local sky = Instance.new("Sky")
 	sky.Name = "HarborSky"
 	sky.CelestialBodiesShown = true
@@ -115,16 +92,21 @@ local function applySky()
 
 	local atm = Instance.new("Atmosphere")
 	atm.Name = "HarborFog"
-	atm.Density = 0.4
+	atm.Density = 0.35
 	atm.Offset = 0.1
 	atm.Color = Color3.fromRGB(72, 92, 118)
 	atm.Decay = Color3.fromRGB(28, 36, 52)
-	atm.Haze = 1.4
+	atm.Haze = 1.1
 	atm.Parent = Lighting
 end
 
 function World.build()
 	World.wipe()
+
+	local old = Workspace:FindFirstChild("Harbor")
+	if old then
+		old:Destroy()
+	end
 
 	local folder = Instance.new("Folder")
 	folder.Name = "Harbor"
@@ -132,19 +114,20 @@ function World.build()
 
 	applySky()
 
-	local water = part("Water", Vector3.new(500, 8, 500), CFrame.new(0, DOCK_Y - 6, 0), Color3.fromRGB(16, 46, 78), folder, Enum.Material.Glass)
+	part("Dock", Vector3.new(200, 6, 200), CFrame.new(0, DOCK_Y, 0), Color3.fromRGB(92, 62, 36), folder, Enum.Material.Wood)
+
+	local water = part("Water", Vector3.new(500, 8, 500), CFrame.new(0, DOCK_Y - 8, 0), Color3.fromRGB(16, 46, 78), folder, Enum.Material.Glass)
 	water.Transparency = 0.35
+	water.CanCollide = false
 
-	part("Dock", Vector3.new(180, 4, 180), CFrame.new(0, DOCK_Y, 0), Color3.fromRGB(92, 62, 36), folder, Enum.Material.Wood)
-
-	local pier = part("Pier", Vector3.new(18, 2, 70), CFrame.new(0, DOCK_Y + 1, 110), Color3.fromRGB(112, 78, 44), folder, Enum.Material.Wood)
+	local pier = part("Pier", Vector3.new(18, 2, 70), CFrame.new(0, DOCK_Y + 2, 110), Color3.fromRGB(112, 78, 44), folder, Enum.Material.Wood)
 	labelOn(pier, "PIER — press E to harvest", Vector3.new(0, 9, 0), Color3.fromRGB(255, 220, 120))
 
 	for i = -1, 1, 2 do
-		part("PierRail", Vector3.new(0.6, 2.4, 70), CFrame.new(i * 9, DOCK_Y + 2.6, 110), Color3.fromRGB(72, 50, 30), folder, Enum.Material.Wood)
+		part("PierRail", Vector3.new(0.6, 2.4, 70), CFrame.new(i * 9, DOCK_Y + 3.6, 110), Color3.fromRGB(72, 50, 30), folder, Enum.Material.Wood)
 	end
 
-	local crateAnchor = part("CratePile", Vector3.new(8, 1, 8), CFrame.new(0, DOCK_Y + 2.2, 136), Color3.fromRGB(70, 48, 28), folder, Enum.Material.Wood)
+	local crateAnchor = part("CratePile", Vector3.new(8, 1, 8), CFrame.new(0, DOCK_Y + 3.2, 136), Color3.fromRGB(70, 48, 28), folder, Enum.Material.Wood)
 	labelOn(crateAnchor, "CARGO — E harvest", Vector3.new(0, 8, 0), Color3.fromRGB(255, 240, 180))
 
 	local harvest = Instance.new("ProximityPrompt")
@@ -176,15 +159,15 @@ function World.build()
 		box:SetAttribute("FullSizeZ", 2.6)
 	end
 
-	part("TowerBase", Vector3.new(14, 2, 14), CFrame.new(0, DOCK_Y + 3, 0), Color3.fromRGB(48, 48, 62), folder)
-	part("BellTower", Vector3.new(7, 24, 7), CFrame.new(0, DOCK_Y + 16, 0), Color3.fromRGB(42, 42, 58), folder)
-	local bell = part("Bell", Vector3.new(6, 4, 6), CFrame.new(0, DOCK_Y + 28, 0), Color3.fromRGB(228, 186, 52), folder, Enum.Material.Neon)
+	part("TowerBase", Vector3.new(14, 2, 14), CFrame.new(0, DOCK_Y + 4, 0), Color3.fromRGB(48, 48, 62), folder)
+	part("BellTower", Vector3.new(7, 24, 7), CFrame.new(0, DOCK_Y + 17, 0), Color3.fromRGB(42, 42, 58), folder)
+	local bell = part("Bell", Vector3.new(6, 4, 6), CFrame.new(0, DOCK_Y + 30, 0), Color3.fromRGB(228, 186, 52), folder, Enum.Material.Neon)
 	labelOn(bell, "THE BELL  -  P rebirth at 500", Vector3.new(0, 8, 0), Color3.fromRGB(255, 220, 90))
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "SpawnLocation"
 	spawn.Size = Vector3.new(12, 1, 12)
-	spawn.CFrame = CFrame.new(0, DOCK_Y + 3, 16)
+	spawn.CFrame = CFrame.new(0, DOCK_Y + 4, 16)
 	spawn.Anchored = true
 	spawn.Duration = 0
 	spawn.Neutral = true
@@ -195,11 +178,11 @@ function World.build()
 	stalls.Name = "Stalls"
 	stalls.Parent = folder
 
-	local stallY = DOCK_Y + 2.5
+	local stallY = DOCK_Y + 3.5
 	for i = 1, Config.MaxStalls do
 		local a = ((i - 1) / Config.MaxStalls) * math.pi * 2
 		local pos = Vector3.new(math.cos(a) * Config.RingRadius, stallY, math.sin(a) * Config.RingRadius)
-		local look = CFrame.new(pos, Vector3.new(0, stallY, 0))
+		local look = CFrame.lookAt(pos, Vector3.new(0, stallY, 0))
 		local m = Instance.new("Model")
 		m.Name = "Stall_" .. i
 		m.Parent = stalls
@@ -237,8 +220,8 @@ function World.setNight(on: boolean)
 
 	local atm = Lighting:FindFirstChild("HarborFog")
 	if atm and atm:IsA("Atmosphere") then
-		atm.Density = if on then 0.55 else 0.4
-		atm.Haze = if on then 2.2 else 1.4
+		atm.Density = if on then 0.55 else 0.35
+		atm.Haze = if on then 2.2 else 1.1
 	end
 
 	local harbor = Workspace:FindFirstChild("Harbor")
