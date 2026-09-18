@@ -9,8 +9,16 @@
     },
     "ServerScriptService": {
       "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "Boot": {
+        "$className": "Script",
+        "$path": "src/ServerScriptService/Boot.server.lua"
+      },
       "Services": { "$path": "src/ServerScriptService/Services" },
-      "Main": { "$path": "src/ServerScriptService/Main.server.lua" }
+      "Main": {
+        "$className": "Script",
+        "$path": "src/ServerScriptService/Main.server.lua"
+      }
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
@@ -29,7 +37,7 @@
     },
     "StarterPack": {
       "$className": "StarterPack",
-      "$ignoreUnknownInstances": false
+      "$ignoreUnknownInstances": true
     },
     "SoundService": { "$className": "SoundService" }
   }
