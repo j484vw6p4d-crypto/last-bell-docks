@@ -13,11 +13,15 @@ pcall(function()
 	workspace.Terrain:Clear()
 end)
 for _, child in ipairs(workspace:GetChildren()) do
-	if not child:IsA("Camera") and not child:IsA("Terrain") and not child:FindFirstChildOfClass("Humanoid") then
-		pcall(function()
-			child:Destroy()
-		end)
+	if child:IsA("Camera") or child:IsA("Terrain") then
+		continue
 	end
+	if Players:GetPlayerFromCharacter(child) then
+		continue
+	end
+	pcall(function()
+		child:Destroy()
+	end)
 end
 
 local Config = require(RS:WaitForChild("Shared"):WaitForChild("Config"))

@@ -125,6 +125,12 @@ Remotes.get("PlaySound").OnClientEvent:Connect(function(key)
 	game:GetService("Debris"):AddItem(s, 3)
 end)
 
+task.delay(4, function()
+	if workspace:FindFirstChild("Harbor") == nil then
+		toast.Text = "Harbor missing. Stop Play. File > New > Baseplate. Rojo Connect. Play."
+	end
+end)
+
 task.spawn(function()
 	while true do
 		task.wait(1)

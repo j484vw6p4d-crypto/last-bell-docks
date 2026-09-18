@@ -57,9 +57,7 @@ local function keepInstance(inst: Instance): boolean
 	if inst.Name == "Harbor" then
 		return true
 	end
-	if inst:IsA("Model") and inst:FindFirstChildOfClass("Humanoid") then
-		return true
-	end
+	-- Only keep real players. Leftover map kits often have dummy Humanoids.
 	if Players:GetPlayerFromCharacter(inst) ~= nil then
 		return true
 	end
